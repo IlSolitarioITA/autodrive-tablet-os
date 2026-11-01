@@ -20,7 +20,7 @@ export default defineConfig(() => {
           theme_color: '#090D16',
           background_color: '#090D16',
           display: 'standalone',
-          orientation: 'landscape',
+          orientation: 'any',
           start_url: '/',
           scope: '/',
           icons: [
@@ -78,8 +78,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],

@@ -798,8 +798,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Strict 3-Zone Top Navigation Bar Contract */}
-      <header className="flex items-center justify-between gap-8 px-6 py-3 border-b border-slate-800 bg-slate-950/95">
+      {/* Responsive 3-Zone Top Navigation Bar: Single Row on Tablet/Desktop, Clean 2-Row Stack on Smartphone */}
+      <header className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-4 gap-y-2 px-3.5 sm:px-6 py-2.5 sm:py-3 border-b border-slate-800 bg-slate-950/95">
         {/* Zone 1: Brand Title (Single Text Element, One Line) */}
         <a
           href="#cockpit"
@@ -807,7 +807,7 @@ export default function App() {
             e.preventDefault();
             setActiveSection('cockpit');
           }}
-          className="text-lg font-extrabold tracking-tight text-white whitespace-nowrap shrink-0"
+          className="order-1 text-base sm:text-lg font-extrabold tracking-tight text-white whitespace-nowrap shrink-0"
         >
           AutoDrive Tablet OS
         </a>
@@ -815,7 +815,7 @@ export default function App() {
         {/* Zone 2: 5 Concise Single-Line Navigation Links */}
         <nav
           aria-label="Navigazione Principale Sistema Auto"
-          className="flex items-center gap-6 text-sm font-medium text-slate-300 overflow-x-auto"
+          className="order-3 lg:order-2 w-full lg:w-auto flex items-center gap-4 sm:gap-6 text-xs sm:text-sm font-medium text-slate-300 overflow-x-auto pt-1.5 lg:pt-0 border-t lg:border-t-0 border-slate-800/70"
         >
           <a
             href="#cockpit"
@@ -890,44 +890,44 @@ export default function App() {
         </nav>
 
         {/* Zone 3: 1 Primary Action (Direct APK / Android Package Download) */}
-        <div className="flex items-center shrink-0">
+        <div className="order-2 lg:order-3 flex items-center shrink-0">
           <PWAInstallButton onOpenApkBuilder={() => setActiveSection('apk_github')} />
         </div>
       </header>
 
       {/* Main Content Workspace */}
-      <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-3 flex flex-col gap-3">
+      <main className="flex-1 w-full max-w-[1440px] mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex flex-col gap-3">
         {/* Dual-Engine Voice Command Bar & Automatic Failover Controller */}
         <section
           aria-label="Controllo Vocale Ibrido Locale e Gemini"
-          className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-2.5"
+          className="p-3 sm:p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-2.5"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
             {/* Microphone Button + Voice Command Input */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 executeVoiceCommand(voiceInputText);
               }}
-              className="flex-1 min-w-[280px] flex items-center gap-2.5"
+              className="w-full lg:flex-1 flex items-center gap-2"
             >
               <button
                 type="button"
                 onClick={handleStartMicrophone}
                 aria-label="Attiva comando vocale microfono"
-                className={`min-h-[46px] min-w-[46px] px-3.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-colors shrink-0 ${
+                className={`min-h-[44px] sm:min-h-[46px] min-w-[44px] px-3 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors shrink-0 ${
                   isListeningMic
                     ? 'bg-red-600 text-white'
                     : 'bg-blue-600 hover:bg-blue-500 text-white'
                 }`}
               >
-                <Mic className="w-5 h-5" />
+                <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="hidden sm:inline">
                   {isListeningMic ? 'In ascolto...' : 'Parla'}
                 </span>
               </button>
 
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <label htmlFor="voice-command-input" className="sr-only">
                   Pronuncia o scrivi un comando vocale per l’auto
                 </label>
@@ -936,22 +936,22 @@ export default function App() {
                   type="text"
                   value={voiceInputText}
                   onChange={(e) => setVoiceInputText(e.target.value)}
-                  placeholder='Prova: "Riproduci Blinding Lights su Metrolist", "Brano successivo", "Portami a Milano"...'
-                  className="w-full min-h-[46px] px-4 py-2 text-sm bg-slate-950 border border-slate-800 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+                  placeholder='Comando vocale (es. "Riproduci su Metrolist", "Portami a...")'
+                  className="w-full min-h-[44px] sm:min-h-[46px] px-3 sm:px-4 py-2 text-xs sm:text-sm bg-slate-950 border border-slate-800 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isProcessingVoice}
-                className="min-h-[46px] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition-colors whitespace-nowrap shrink-0"
+                className="min-h-[44px] sm:min-h-[46px] px-3 sm:px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition-colors whitespace-nowrap shrink-0"
               >
-                {isProcessingVoice ? 'Elaborazione...' : 'Esegui Comando'}
+                {isProcessingVoice ? 'Attendi...' : 'Esegui'}
               </button>
             </form>
 
             {/* Dual Voice Engine Status & Failover Test Controls */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2">
               <div
                 role="group"
                 aria-label="Modalità motore vocale"
@@ -962,7 +962,7 @@ export default function App() {
                   onClick={() =>
                     setVoiceConfig((prev) => ({ ...prev, mode: 'hybrid_gemini_first' }))
                   }
-                  className={`min-h-[38px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                  className={`min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                     voiceConfig.mode === 'hybrid_gemini_first'
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-400 hover:text-white'
@@ -975,21 +975,21 @@ export default function App() {
                   onClick={() =>
                     setVoiceConfig((prev) => ({ ...prev, mode: 'offline_only' }))
                   }
-                  className={`min-h-[38px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                  className={`min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                     voiceConfig.mode === 'offline_only'
                       ? 'bg-emerald-600 text-white'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  100% Locale Offline
+                  100% Locale
                 </button>
               </div>
 
               {/* Token Quota Counter + Simulate Quota Exhaustion Button */}
-              <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+              <div className="flex items-center gap-2 bg-slate-950 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
                 <Cpu className="w-4 h-4 text-blue-400 shrink-0" />
                 <span className="font-mono text-slate-300 tabular-nums">
-                  Token Gemini: <strong>{remainingGeminiTokens}</strong>/{voiceConfig.dailyGeminiLimit}
+                  Token: <strong>{remainingGeminiTokens}</strong>/{voiceConfig.dailyGeminiLimit}
                 </span>
                 {remainingGeminiTokens > 0 ? (
                   <button
@@ -1000,7 +1000,7 @@ export default function App() {
                         dailyGeminiUsed: prev.dailyGeminiLimit,
                       }))
                     }
-                    className="min-h-[32px] px-2 py-0.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 text-[11px] font-medium transition-colors whitespace-nowrap"
+                    className="min-h-[30px] px-2 py-0.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 text-[11px] font-medium transition-colors whitespace-nowrap"
                     title="Simula la fine dei token Gemini per verificare il passaggio automatico al motore locale offline"
                   >
                     Simula Fine Token
@@ -1011,7 +1011,7 @@ export default function App() {
                     onClick={() =>
                       setVoiceConfig((prev) => ({ ...prev, dailyGeminiUsed: 0 }))
                     }
-                    className="min-h-[32px] px-2 py-0.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-[11px] font-medium flex items-center gap-1 transition-colors whitespace-nowrap"
+                    className="min-h-[30px] px-2 py-0.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-[11px] font-medium flex items-center gap-1 transition-colors whitespace-nowrap"
                   >
                     <RotateCcw className="w-3 h-3" />
                     Ripristina Quota
@@ -1023,8 +1023,8 @@ export default function App() {
 
           {/* Quick 1-Tap Voice Command Presets + Active Engine Telemetry */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-slate-400 mr-1">Comandi rapidi:</span>
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5">
+              <span className="text-slate-400 mr-1 shrink-0">Comandi rapidi:</span>
               {[
                 'Riproduci Blinding Lights su Metrolist',
                 'Brano successivo',
@@ -1035,7 +1035,7 @@ export default function App() {
                   key={presetCmd}
                   type="button"
                   onClick={() => executeVoiceCommand(presetCmd)}
-                  className="min-h-[34px] px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors whitespace-nowrap"
+                  className="min-h-[34px] px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors whitespace-nowrap shrink-0"
                 >
                   &ldquo;{presetCmd}&rdquo;
                 </button>

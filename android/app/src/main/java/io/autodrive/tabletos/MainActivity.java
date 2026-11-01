@@ -6,11 +6,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.View;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -20,7 +18,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import androidx.webkit.WebViewAssetLoader;
+import java.io.InputStream;
 import org.json.JSONObject;
 
 public class MainActivity extends Activity {
@@ -31,9 +29,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Mantieni lo schermo sempre acceso durante la guida in auto
+        // Mantieni lo schermo acceso durante l'utilizzo in auto
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        hideSystemUI();
 
         // Richiedi subito i permessi GPS e Microfono all'avvio dell'APK
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -50,39 +47,39 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
         settings.setGeolocationEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(true);
-
-        // Carica il bundle compilato (dist/) direttamente dagli assets interni dell'APK su dominio sicuro https://
-        final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
-            .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
-            .build();
+        settings.setAllowContentAccess(true);
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
-                if ("appassets.androidplatform.net".equals(url.getHost())) {
+                if (url != null && "autodrive.local".equals(url.getHost())) {
                     String path = url.getPath();
                     if (path == null || path.equals("/") || !path.contains(".")) {
-                        return assetLoader.shouldInterceptRequest(
-                            Uri.parse("https://appassets.androidplatform.net/assets/public/index.html")
-                        );
+                        path = "/index.html";
                     }
-                    if (!path.startsWith("/assets/")) {
-                        return assetLoader.shouldInterceptRequest(
-                            Uri.parse("https://appassets.androidplatform.net/assets/public" + path)
-                        );
+                    String assetPath = "public" + path;
+                    String mime = getMimeType(path);
+                    try {
+                        InputStream is = getAssets().open(assetPath);
+                        return new WebResourceResponse(mime, "UTF-8", is);
+                    } catch (Exception e) {
+                        try {
+                            InputStream fallback = getAssets().open("public/index.html");
+                            return new WebResourceResponse("text/html", "UTF-8", fallback);
+                        } catch (Exception ignored) {}
                     }
                 }
-                return assetLoader.shouldInterceptRequest(url);
+                return super.shouldInterceptRequest(view, request);
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
-                // Gestione nativa degli Intent Android (Metrolist, VLC, Google Maps, WhatsApp)
                 if (url.startsWith("intent:") || url.startsWith("google.navigation:")) {
                     try {
                         Intent intent = url.startsWith("intent:")
@@ -90,8 +87,8 @@ public class MainActivity extends Activity {
                             : new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(intent);
-                    } catch (Exception ignored) {
-                        // Se il pacchetto specifico non risponde, prova ad aprire il package direttamente
+                    } catch (Exception e) {
+                        // Fallback se l'app non è installata
                     }
                     return true;
                 }
@@ -102,18 +99,15 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                // Concede automaticamente il GPS reale all'interfaccia di guida
                 callback.invoke(origin, true, false);
             }
 
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                // Concede automaticamente il microfono per i comandi vocali
                 request.grant(request.getResources());
             }
         });
 
-        // Ricevitore per notifiche WhatsApp reali intercettate dal servizio nativo
         whatsappReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -136,18 +130,28 @@ public class MainActivity extends Activity {
             registerReceiver(whatsappReceiver, filter);
         }
 
-        webView.loadUrl("https://appassets.androidplatform.net/assets/public/index.html");
+        webView.loadUrl("https://autodrive.local/index.html");
     }
 
-    private void hideSystemUI() {
-        getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_FULLSCREEN
-        );
+    private String getMimeType(String path) {
+        if (path.endsWith(".html")) return "text/html";
+        if (path.endsWith(".js") || path.endsWith(".mjs")) return "application/javascript";
+        if (path.endsWith(".css")) return "text/css";
+        if (path.endsWith(".svg")) return "image/svg+xml";
+        if (path.endsWith(".png")) return "image/png";
+        if (path.endsWith(".json") || path.endsWith(".webmanifest")) return "application/json";
+        if (path.endsWith(".woff2")) return "font/woff2";
+        if (path.endsWith(".woff")) return "font/woff";
+        return "application/octet-stream";
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
     }
 
     @Override

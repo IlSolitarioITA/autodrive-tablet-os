@@ -11,16 +11,53 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 }) => {
   const { isInstallable, install } = usePWAInstall();
   const [showModal, setShowModal] = useState(false);
+  const [downloadingType, setDownloadingType] = useState<'zip' | 'html' | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<string>('');
+
+  const handleVerifiedDownload = async (
+    endpoint: string,
+    filename: string,
+    mimeType: string,
+    type: 'zip' | 'html'
+  ) => {
+    setDownloadingType(type);
+    setDownloadStatus(`Preparazione di ${filename} in corso...`);
+    try {
+      const resp = await fetch(endpoint, { cache: 'no-store' });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const arrayBuf = await resp.arrayBuffer();
+      const blob = new Blob([arrayBuf], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+      setDownloadStatus(
+        `Scaricato ${filename} (${Math.round(arrayBuf.byteLength / 1024)} KB)! Aprilo dalla cartella Download del dispositivo.`
+      );
+    } catch (err) {
+      setDownloadStatus(
+        `Errore durante il download: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
+      setDownloadingType(null);
+    }
+  };
 
   return (
     <>
       <button
         type="button"
         onClick={() => setShowModal(true)}
-        className="min-h-[44px] flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition-colors whitespace-nowrap shrink-0"
+        className="min-h-[40px] sm:min-h-[44px] flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 px-3 sm:px-4 py-2 text-xs font-semibold text-white transition-colors whitespace-nowrap shrink-0"
       >
         <Download className="w-4 h-4 shrink-0" />
-        Scarica APK / App Android
+        <span>Scarica APK / App</span>
       </button>
 
       {showModal && (
@@ -28,11 +65,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="pwa-install-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
         >
-          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 text-slate-100 space-y-4">
+          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-4 sm:p-6 text-slate-100 space-y-4 my-auto">
             <div>
-              <h3 id="pwa-install-dialog-title" className="text-lg font-bold text-white">
+              <h3 id="pwa-install-dialog-title" className="text-base sm:text-lg font-bold text-white">
                 Scarica AutoDrive Tablet OS su Android (Senza AI Studio)
               </h3>
               <p className="mt-1 text-xs text-slate-300 leading-relaxed">
@@ -48,52 +85,78 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                   setShowModal(false);
                   onOpenApkBuilder?.();
                 }}
-                className="w-full p-4 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/50 text-left flex items-start gap-3 transition-colors"
+                className="w-full p-3.5 sm:p-4 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/50 text-left flex items-start gap-3 transition-colors"
               >
                 <Rocket className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                 <div>
                   <span className="text-sm font-bold text-white block">
-                    1. Compila il File .APK Nativo nel Cloud (GitHub Actions 1-Click)
+                    1. Compila e Scarica il File .APK Nativo (GitHub Cloud 1-Click)
                   </span>
                   <span className="text-xs text-slate-300 block mt-0.5">
-                    Genera automaticamente il vero file <code>AutoDrive-Tablet-OS.apk</code> firmato con <code>MainActivity.java</code>, permessi Metrolist e servizio WhatsApp, pronto da installare sul telefono.
+                    Genera automaticamente il vero file <code>AutoDrive-Tablet-OS.apk</code> firmato con <code>MainActivity.java</code> (SDK 34 senza dipendenze esterne), pronto da installare sul telefono o tablet.
                   </span>
                 </div>
               </button>
 
               {/* Option 2: Download Complete Android Studio + Gradle ZIP */}
-              <a
-                href="/api/apk/download-project-zip"
-                download="AutoDrive-Tablet-OS-Android-Complete.zip"
-                className="w-full p-4 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-left flex items-start gap-3 transition-colors"
+              <button
+                type="button"
+                disabled={downloadingType !== null}
+                onClick={() =>
+                  handleVerifiedDownload(
+                    '/api/apk/download-project-zip',
+                    'AutoDrive-Tablet-OS-Android-Complete.zip',
+                    'application/zip',
+                    'zip'
+                  )
+                }
+                className="w-full p-3.5 sm:p-4 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 disabled:opacity-60 border border-emerald-500/50 text-left flex items-start gap-3 transition-colors"
               >
                 <Archive className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <span className="text-sm font-bold text-white block">
-                    2. Scarica Pacchetto Completo Android (.ZIP con tutti i file)
+                    {downloadingType === 'zip'
+                      ? 'Compressione e download .ZIP in corso...'
+                      : '2. Scarica Pacchetto Completo Android (.ZIP Standard DEFLATE)'}
                   </span>
                   <span className="text-xs text-slate-300 block mt-0.5">
-                    Scarica in un unico file <code>.zip</code> l’intera applicazione compilata + la cartella nativa <code>android/</code> (Gradle + Java) + il compilatore automatico APK.
+                    Scarica in un unico archivio <code>.zip</code> standard (compatibile con tutti i gestori file Android) l’intera app compilata + la cartella nativa <code>android/</code>.
                   </span>
                 </div>
-              </a>
+              </button>
 
               {/* Option 3: Download Single-File Standalone Offline HTML */}
-              <a
-                href="/api/apk/download-standalone-html"
-                download="AutoDrive-Tablet-OS-Standalone.html"
-                className="w-full p-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left flex items-start gap-3 transition-colors"
+              <button
+                type="button"
+                disabled={downloadingType !== null}
+                onClick={() =>
+                  handleVerifiedDownload(
+                    '/api/apk/download-standalone-html',
+                    'AutoDrive-Tablet-OS-Standalone.html',
+                    'text/html;charset=utf-8',
+                    'html'
+                  )
+                }
+                className="w-full p-3.5 sm:p-4 rounded-xl bg-slate-950 hover:bg-slate-800 disabled:opacity-60 border border-slate-800 text-left flex items-start gap-3 transition-colors"
               >
                 <FileCode className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div>
                   <span className="text-sm font-bold text-white block">
-                    3. Scarica App Autonoma Singolo File (.HTML Offline sul Telefono)
+                    {downloadingType === 'html'
+                      ? 'Generazione file .HTML autonomo in corso...'
+                      : '3. Scarica App Autonoma Singolo File (.HTML Offline sul Telefono)'}
                   </span>
                   <span className="text-xs text-slate-300 block mt-0.5">
                     Scarica direttamente sul telefono un singolo file con tutta l’app incorporata che gira al 100% fuori da AI Studio.
                   </span>
                 </div>
-              </a>
+              </button>
+
+              {downloadStatus && (
+                <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 font-medium">
+                  {downloadStatus}
+                </div>
+              )}
 
               {isInstallable && (
                 <button

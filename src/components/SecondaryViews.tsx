@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wifi,
   Bluetooth,
@@ -18,6 +18,7 @@ import {
   Rocket,
   ExternalLink,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   MediaAppConfig,
@@ -688,8 +689,12 @@ export const OfflineMapsView: React.FC<OfflineMapsViewProps> = ({
  * ============================================================================ */
 export const ApkGithubBuilderView: React.FC = () => {
   const androidProjectFiles = getCompleteAndroidProjectFiles();
-  const [selectedFileIndex, setSelectedFileIndex] = useState<number>(4); // defaults to MainActivity.java or AndroidManifest.xml
+  const [selectedFileIndex, setSelectedFileIndex] = useState<number>(4);
   const [copiedNotice, setCopiedNotice] = useState('');
+
+  // Verified Direct Binary Download State (.ZIP & .HTML)
+  const [downloadingPackage, setDownloadingPackage] = useState<'zip' | 'html' | null>(null);
+  const [downloadFeedback, setDownloadFeedback] = useState('');
 
   // 1-Click GitHub Cloud APK Builder State
   const [githubToken, setGithubToken] = useState('');
@@ -697,12 +702,104 @@ export const ApkGithubBuilderView: React.FC = () => {
   const [isPushingGithub, setIsPushingGithub] = useState(false);
   const [githubBuildError, setGithubBuildError] = useState('');
   const [githubBuildSuccess, setGithubBuildSuccess] = useState<{
+    owner: string;
+    repo: string;
     repoUrl: string;
     actionsUrl: string;
     releasesUrl: string;
   } | null>(null);
 
+  // Live GitHub Actions & Release Polling State
+  const [liveStatus, setLiveStatus] = useState<{
+    runStatus: string;
+    runConclusion: string | null;
+    runHtmlUrl: string;
+    releaseReady: boolean;
+    apkDownloadUrl: string;
+    releaseHtmlUrl: string;
+    releaseTag: string;
+  } | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+
   const activeFile = androidProjectFiles[selectedFileIndex] || androidProjectFiles[0];
+
+  const handleVerifiedPackageDownload = async (
+    endpoint: string,
+    filename: string,
+    mimeType: string,
+    kind: 'zip' | 'html'
+  ) => {
+    setDownloadingPackage(kind);
+    setDownloadFeedback(`Generazione e verifica di ${filename} in corso...`);
+    try {
+      const resp = await fetch(endpoint, { cache: 'no-store' });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const arrayBuf = await resp.arrayBuffer();
+      const blob = new Blob([arrayBuf], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+      setDownloadFeedback(
+        `Download completato: ${filename} (${Math.round(arrayBuf.byteLength / 1024)} KB). Aprilo dall’app File / Download del telefono!`
+      );
+    } catch (err) {
+      setDownloadFeedback(
+        `Errore download: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
+      setDownloadingPackage(null);
+    }
+  };
+
+  const checkGithubBuildStatus = async (owner: string, repo: string, token: string) => {
+    setIsCheckingStatus(true);
+    try {
+      const params = new URLSearchParams({
+        owner,
+        repo,
+        token: token.trim(),
+      });
+      const resp = await fetch(`/api/apk/github-status?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setLiveStatus(data);
+      }
+    } catch {
+      // ignore transient network errors during poll
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!githubBuildSuccess) return;
+    const { owner, repo } = githubBuildSuccess;
+
+    // Initial check after 2.5 seconds
+    const initialTimer = setTimeout(() => {
+      checkGithubBuildStatus(owner, repo, githubToken);
+    }, 2500);
+
+    // Poll every 5 seconds until APK release is ready or workflow concludes
+    const interval = setInterval(() => {
+      if (liveStatus?.releaseReady) return;
+      checkGithubBuildStatus(owner, repo, githubToken);
+    }, 5000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [githubBuildSuccess, githubToken, liveStatus?.releaseReady]);
 
   const handleCopyCode = () => {
     navigator.clipboard?.writeText(activeFile.content);
@@ -724,10 +821,11 @@ export const ApkGithubBuilderView: React.FC = () => {
     e.preventDefault();
     setGithubBuildError('');
     setGithubBuildSuccess(null);
+    setLiveStatus(null);
 
     if (!githubToken.trim()) {
       setGithubBuildError(
-        'Incolla un Token GitHub (premi "Crea Token su GitHub" qui a fianco per crearlo in 5 secondi).'
+        'Incolla un Token GitHub (premi "1. Ottieni Token su GitHub" qui sopra per crearlo in 5 secondi).'
       );
       return;
     }
@@ -749,6 +847,8 @@ export const ApkGithubBuilderView: React.FC = () => {
         );
       } else {
         setGithubBuildSuccess({
+          owner: data.owner,
+          repo: data.repo,
           repoUrl: data.repoUrl,
           actionsUrl: data.actionsUrl,
           releasesUrl: data.releasesUrl,
@@ -766,82 +866,108 @@ export const ApkGithubBuilderView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* SECTION 1: 1-CLICK COMPLETE ANDROID PROJECT (.ZIP) & STANDALONE (.HTML) DOWNLOAD */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-blue-500/40 space-y-5">
+      <div className="p-4 sm:p-6 rounded-2xl bg-slate-900 border border-blue-500/40 space-y-5">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Archive className="w-5 h-5 text-emerald-400" />
-            Scarica l’Intera Applicazione Android (Senza il Sito di AI Studio)
+          <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <Archive className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span>Scarica l’Intera Applicazione Android (Senza il Sito di AI Studio)</span>
           </h2>
           <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-            Quando usi il menu dei 3 puntini di Chrome dentro Google AI Studio, Chrome installa il sito di AI Studio invece della tua app. Qui sotto puoi <strong>scaricare direttamente l’intero progetto nativo Android completo</strong> oppure <strong>far compilare automaticamente il vero file <code>AutoDrive-Tablet-OS.apk</code></strong>:
+            Usa i pulsanti qui sotto per scaricare l’archivio <code>.zip</code> compresso con algoritmo standard <strong>DEFLATE</strong> (compatibile al 100% con l’app File di Android, ZArchiver e PC) oppure per compilare e scaricare direttamente il file installabile <strong><code>AutoDrive-Tablet-OS.apk</code></strong>:
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Button A: Complete Android Studio + Gradle + Web Project ZIP */}
-          <a
-            href="/api/apk/download-project-zip"
-            download="AutoDrive-Tablet-OS-Android-Complete.zip"
-            className="p-5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 flex flex-col justify-between gap-3 transition-colors"
+          <button
+            type="button"
+            disabled={downloadingPackage !== null}
+            onClick={() =>
+              handleVerifiedPackageDownload(
+                '/api/apk/download-project-zip',
+                'AutoDrive-Tablet-OS-Android-Complete.zip',
+                'application/zip',
+                'zip'
+              )
+            }
+            className="p-4 sm:p-5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 disabled:opacity-60 border border-emerald-500/50 flex flex-col justify-between gap-3 text-left transition-colors"
           >
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 w-full">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-400">
-                  Pacchetto Completo Nativo Android (.ZIP)
+                  Pacchetto Completo Nativo Android (.ZIP Standard)
                 </span>
-                <Download className="w-5 h-5 text-emerald-400" />
+                <Download className="w-5 h-5 text-emerald-400 shrink-0" />
               </div>
-              <h3 className="text-base font-bold text-white">
-                Scarica AutoDrive-Tablet-OS-Android-Complete.zip
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                {downloadingPackage === 'zip'
+                  ? 'Preparazione archivio .ZIP in corso...'
+                  : 'Scarica AutoDrive-Tablet-OS-Android-Complete.zip'}
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Un unico file <code>.zip</code> che contiene <strong>tutta l’applicazione compilata</strong> + la cartella nativa <code>android/</code> (<code>MainActivity.java</code> a schermo intero, <code>WhatsAppNotificationService.java</code>, permessi Metrolist e Gradle) + il workflow automatico per generare l’APK.
+                Un unico archivio <code>.zip</code> verificato (con compressione DEFLATE e intestazioni MS-DOS compatibili con Android) che contiene <strong>tutta l’app già compilata</strong> + la cartella nativa <code>android/</code> (SDK 34 senza dipendenze esterne).
               </p>
             </div>
             <div className="pt-2 flex items-center gap-2 text-xs font-bold text-emerald-300">
-              <span>Clicca qui per scaricare subito lo .ZIP completo</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Tocca qui per scaricare lo .ZIP verificato</span>
+              <Download className="w-3.5 h-3.5" />
             </div>
-          </a>
+          </button>
 
           {/* Button B: Single-File Standalone Offline HTML */}
-          <a
-            href="/api/apk/download-standalone-html"
-            download="AutoDrive-Tablet-OS-Standalone.html"
-            className="p-5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/50 flex flex-col justify-between gap-3 transition-colors"
+          <button
+            type="button"
+            disabled={downloadingPackage !== null}
+            onClick={() =>
+              handleVerifiedPackageDownload(
+                '/api/apk/download-standalone-html',
+                'AutoDrive-Tablet-OS-Standalone.html',
+                'text/html;charset=utf-8',
+                'html'
+              )
+            }
+            className="p-4 sm:p-5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 disabled:opacity-60 border border-blue-500/50 flex flex-col justify-between gap-3 text-left transition-colors"
           >
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 w-full">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-blue-400">
                   Eseguibile Unico Offline per Telefono/Tablet (.HTML)
                 </span>
-                <Smartphone className="w-5 h-5 text-blue-400" />
+                <Smartphone className="w-5 h-5 text-blue-400 shrink-0" />
               </div>
-              <h3 className="text-base font-bold text-white">
-                Scarica AutoDrive-Tablet-OS-Standalone.html
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                {downloadingPackage === 'html'
+                  ? 'Generazione file .HTML in corso...'
+                  : 'Scarica AutoDrive-Tablet-OS-Standalone.html'}
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Scarica l’intera applicazione fusa in <strong>un singolo file autonomo</strong>. Puoi salvarlo direttamente nella memoria del tuo telefono/tablet Android e aprirlo (o convertirlo in APK con <em>WebCode / APK Creator</em>) senza passare mai da AI Studio.
+                Scarica l’intera applicazione fusa in <strong>un singolo file autonomo</strong>. Puoi aprirlo direttamente sul tuo telefono o tablet Android con Chrome (senza passare mai da AI Studio).
               </p>
             </div>
             <div className="pt-2 flex items-center gap-2 text-xs font-bold text-blue-300">
-              <span>Clicca qui per scaricare il file Standalone sul Telefono</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Tocca qui per scaricare il file Standalone sul Telefono</span>
+              <Download className="w-3.5 h-3.5" />
             </div>
-          </a>
+          </button>
         </div>
+
+        {downloadFeedback && (
+          <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 font-medium">
+            {downloadFeedback}
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: 1-CLICK CLOUD APK COMPILER VIA GITHUB ACTIONS */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+      <div className="p-4 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Rocket className="w-5 h-5 text-blue-400" />
-              Compilatore Cloud Automatico del File .APK (Senza usare il PC)
+            <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <Rocket className="w-5 h-5 text-blue-400 shrink-0" />
+              <span>Compilatore Cloud Automatico del File .APK (Zero-Dependency SDK 34)</span>
             </h2>
-            <p className="text-xs text-slate-300 mt-1 max-w-3xl">
-              Vuoi ottenere direttamente il file installabile <strong><code>AutoDrive-Tablet-OS.apk</code></strong> firmato sul tuo telefono senza installare Android Studio? Inserisci un Token GitHub qui sotto: il nostro server creerà il repository, caricherà il progetto Android Java nativo e avvierà la compilazione dell’APK sui server di GitHub!
+            <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
+              Inserisci il tuo Token GitHub (con permessi <code>repo</code> e <code>workflow</code>) e premi <strong>2. Compila .APK su GitHub</strong>. Il server caricherà il progetto Android puro (senza dipendenze Maven esterne che possano fallire) con il bundle web già pre-compilato dentro <code>assets/public/</code> e monitorerà in automatico qui sotto la creazione del file <strong><code>AutoDrive-Tablet-OS.apk</code></strong>!
             </p>
           </div>
 
@@ -873,7 +999,7 @@ export const ApkGithubBuilderView: React.FC = () => {
 
           <div className="md:col-span-4">
             <label htmlFor="gh-repo-input" className="block text-xs text-slate-400 mb-1">
-              Nome Repository GitHub da creare
+              Nome Repository GitHub
             </label>
             <input
               id="gh-repo-input"
@@ -892,7 +1018,7 @@ export const ApkGithubBuilderView: React.FC = () => {
               className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-bold text-white flex items-center justify-center gap-2 transition-colors"
             >
               <Rocket className="w-4 h-4" />
-              {isPushingGithub ? 'Caricamento su GitHub...' : '2. Compila .APK su GitHub'}
+              {isPushingGithub ? 'Invio a GitHub...' : '2. Compila .APK su GitHub'}
             </button>
           </div>
         </form>
@@ -904,53 +1030,109 @@ export const ApkGithubBuilderView: React.FC = () => {
         )}
 
         {githubBuildSuccess && (
-          <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/50 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-bold text-emerald-300">
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-              <span>
-                Progetto Android caricato con successo! GitHub sta compilando <code>AutoDrive-Tablet-OS.apk</code> (richiede ~90 secondi).
-              </span>
+          <div className="p-4 rounded-xl bg-slate-950 border border-blue-500/50 space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span>
+                  Repository <code>{githubBuildSuccess.owner}/{githubBuildSuccess.repo}</code> aggiornato!
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={isCheckingStatus}
+                onClick={() =>
+                  checkGithubBuildStatus(
+                    githubBuildSuccess.owner,
+                    githubBuildSuccess.repo,
+                    githubToken
+                  )
+                }
+                className="min-h-[36px] px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isCheckingStatus ? 'animate-spin' : ''}`} />
+                <span>Aggiorna Stato Build</span>
+              </button>
             </div>
+
+            {/* Live Status Indicator */}
+            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-slate-400">Stato Compilatore Android SDK 34 su GitHub:</span>
+                <span className="font-mono font-bold text-blue-400">
+                  {liveStatus?.releaseReady
+                    ? `COMPLETATO (${liveStatus.releaseTag || 'APK Pronto'})`
+                    : liveStatus?.runConclusion === 'failure'
+                    ? 'ERRORE WORKFLOW (vedi log Actions)'
+                    : liveStatus?.runStatus === 'in_progress'
+                    ? 'COMPILAZIONE GRADLE IN CORSO (~40 sec)...'
+                    : 'AVVIO COMPILAZIONE IN CODA (~45-60 sec)...'}
+                </span>
+              </div>
+
+              {!liveStatus?.releaseReady && (
+                <p className="text-xs text-amber-300 leading-relaxed">
+                  Nota importante: finché la compilazione è in corso (circa 45–60 secondi), la pagina Releases di GitHub è ancora vuota e mostra <em>&ldquo;Create a new release&rdquo;</em>. <strong>Attendi qui qualche secondo</strong>: non appena la compilazione finisce, comparirà qui sotto il pulsante verde per scaricare direttamente il file <code>AutoDrive-Tablet-OS.apk</code>!
+                </p>
+              )}
+            </div>
+
             <div className="flex flex-wrap items-center gap-3">
+              {liveStatus?.releaseReady && liveStatus.apkDownloadUrl ? (
+                <a
+                  href={liveStatus.apkDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-h-[46px] px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs sm:text-sm font-extrabold text-white flex items-center gap-2 shadow-lg"
+                >
+                  <Download className="w-4 h-4 shrink-0" />
+                  <span>SCARICA ORA AutoDrive-Tablet-OS.apk (File .APK Pronto!)</span>
+                </a>
+              ) : null}
+
               <a
-                href={githubBuildSuccess.actionsUrl}
+                href={liveStatus?.runHtmlUrl || githubBuildSuccess.actionsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="min-h-[42px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white flex items-center gap-1.5"
               >
-                <span>Segui Compilazione APK Live (GitHub Actions)</span>
+                <span>Vedi Compilazione in Tempo Reale (GitHub Actions)</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
-              <a
-                href={githubBuildSuccess.releasesUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[42px] px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white flex items-center gap-1.5"
-              >
-                <span>Apri Pagina Download APK (GitHub Releases)</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+
+              {liveStatus?.releaseReady && (
+                <a
+                  href={liveStatus.releaseHtmlUrl || githubBuildSuccess.releasesUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5"
+                >
+                  <span>Apri Pagina Release ({liveStatus.releaseTag})</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* SECTION 3: SECURITY & NATIVE CAPABILITIES OVERVIEW */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="p-4 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
         <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
           <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-            <ShieldCheck className="w-5 h-5" />
-            1. Activity Nativa Fullscreen Landscape
+            <ShieldCheck className="w-5 h-5 shrink-0" />
+            <span>1. Adattivo Telefono (Verticale) & Tablet (Orizzontale)</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            <code>MainActivity.java</code> blocca lo schermo in orizzontale (<code>sensorLandscape</code>), mantiene il display sempre acceso in guida (<code>FLAG_KEEP_SCREEN_ON</code>) ed esegue l’app dagli assets interni dell’APK senza alcun browser.
+            <code>MainActivity.java</code> usa <code>fullSensor</code> e carica l’interfaccia responsive: sul tuo smartphone puoi testarlo comodamente in verticale o orizzontale, mentre sul tablet auto si dispone automaticamente in plancia split-screen.
           </p>
         </div>
 
         <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
           <div className="flex items-center gap-2 text-blue-400 font-bold text-sm">
-            <ShieldCheck className="w-5 h-5" />
-            2. Lancio Nativo Intent Metrolist & Maps
+            <ShieldCheck className="w-5 h-5 shrink-0" />
+            <span>2. Lancio Nativo Intent Metrolist & Maps</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
             Il metodo nativo <code>shouldOverrideUrlLoading</code> in <code>MainActivity.java</code> intercetta gli URI <code>intent:</code> e <code>google.navigation:</code> e avvia direttamente <strong>Metrolist</strong> (<code>com.metrolist.music</code>) e <strong>Google Maps</strong>.
@@ -959,8 +1141,8 @@ export const ApkGithubBuilderView: React.FC = () => {
 
         <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
           <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
-            <AlertTriangle className="w-5 h-5" />
-            3. Servizio Nativo Notifiche WhatsApp
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span>3. Servizio Nativo Notifiche WhatsApp</span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
             <code>WhatsAppNotificationService.java</code> estende <code>NotificationListenerService</code> di Android per catturare in tempo reale i messaggi WhatsApp in arrivo e leggerli con il sintetizzatore vocale dell’auto.
@@ -969,25 +1151,25 @@ export const ApkGithubBuilderView: React.FC = () => {
       </div>
 
       {/* SECTION 4: NATIVE ANDROID SOURCE FILES INSPECTOR */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+      <div className="p-4 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <FileCode className="w-5 h-5 text-blue-400" />
-              Codice Sorgente Nativo Android Incluso nello .ZIP ({androidProjectFiles.length} file)
+            <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <FileCode className="w-5 h-5 text-blue-400 shrink-0" />
+              <span>Codice Sorgente Nativo Android Incluso nello .ZIP ({androidProjectFiles.length} file)</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Tutti questi file sono già inclusi automaticamente quando clicchi su <strong>Scarica AutoDrive-Tablet-OS-Android-Complete.zip</strong> qui sopra.
+              Tutti questi file sono già inclusi automaticamente quando tocchi <strong>Scarica AutoDrive-Tablet-OS-Android-Complete.zip</strong> qui sopra.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 overflow-x-auto max-w-full">
             {androidProjectFiles.map((file, idx) => (
               <button
                 key={file.path}
                 type="button"
                 onClick={() => setSelectedFileIndex(idx)}
-                className={`min-h-[38px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                className={`min-h-[38px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                   selectedFileIndex === idx
                     ? 'bg-blue-600 text-white'
                     : 'text-slate-400 hover:text-white'
@@ -999,12 +1181,12 @@ export const ApkGithubBuilderView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between bg-slate-950 px-4 py-2.5 rounded-t-xl border border-b-0 border-slate-800">
-          <div>
-            <span className="font-mono text-xs text-blue-400 block">{activeFile.path}</span>
-            <span className="text-[11px] text-slate-400">{activeFile.description}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950 px-4 py-2.5 rounded-t-xl border border-b-0 border-slate-800">
+          <div className="min-w-0">
+            <span className="font-mono text-xs text-blue-400 block truncate">{activeFile.path}</span>
+            <span className="text-[11px] text-slate-400 block">{activeFile.description}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {copiedNotice && (
               <span className="text-xs text-emerald-400 font-medium">{copiedNotice}</span>
             )}

@@ -15,46 +15,45 @@ jobs:
       - name: Checkout codice sorgente
         uses: actions/checkout@v4
 
-      - name: Configura Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
       - name: Configura Java 17 per Android SDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Installa dipendenze e compila Web Bundle (dist)
+      - name: Verifica o Compila Web Bundle in Assets Android
         run: |
-          npm install
-          npm run build
-          mkdir -p android/app/src/main/assets/public
-          cp -r dist/* android/app/src/main/assets/public/
+          if [ ! -f "android/app/src/main/assets/public/index.html" ]; then
+            npm install
+            npm run build
+            mkdir -p android/app/src/main/assets/public
+            cp -r dist/* android/app/src/main/assets/public/
+          fi
 
-      - name: Configura Gradle 8.7 e compila APK firmato
+      - name: Configura Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Genera AutoDrive-Tablet-OS.apk
+
+      - name: Compila APK Android Firmato (assembleDebug)
         working-directory: android
-        run: gradle assembleRelease
+        run: gradle assembleDebug --no-daemon
 
-      - name: Rinonima APK pronto per il download
+      - name: Prepara AutoDrive-Tablet-OS.apk
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk ./AutoDrive-Tablet-OS.apk
+          APK_PATH=$(find android -name "*.apk" | head -n 1)
+          cp "$APK_PATH" ./AutoDrive-Tablet-OS.apk
+          ls -lh ./AutoDrive-Tablet-OS.apk
 
-      - name: Carica APK negli Artifacts scaricabili
+      - name: Carica APK negli Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: AutoDrive-Tablet-OS-APK
           path: ./AutoDrive-Tablet-OS.apk
 
-      - name: Pubblica APK nella sezione Releases di GitHub
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: "AutoDrive Tablet OS v1.0.${{ github.run_number }} (APK Android)"
-          body: "Scarica il file **AutoDrive-Tablet-OS.apk** qui sotto e aprilo sul tuo telefono o tablet Android per installare l'applicazione nativa completa."
-          files: ./AutoDrive-Tablet-OS.apk
+      - name: Crea Release Pubblica con Download Diretto APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" ./AutoDrive-Tablet-OS.apk --title "AutoDrive Tablet OS $TAG (APK Android)" --notes "Tocca **AutoDrive-Tablet-OS.apk** sotto Assets per scaricare e installare l'applicazione sul tuo telefono o tablet Android." --latest || true

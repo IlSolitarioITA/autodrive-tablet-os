@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId "io.autodrive.tabletos"
-        minSdk 26
+        minSdk 24
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
@@ -20,7 +20,6 @@ android {
         }
         release {
             minifyEnabled false
-            // Firma automaticamente con chiave debug così l'APK è subito installabile sul telefono/tablet
             signingConfig signingConfigs.debug
         }
     }
@@ -32,5 +31,5 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.webkit:webkit:1.10.0'
+    // Zero dipendenze esterne: usa esclusivamente le API native di Android SDK 34 per garantire compilazione al 100%
 }

@@ -31,15 +31,16 @@
 
     <application
         android:allowBackup="true"
-        android:label="AutoDrive Tablet OS"
+        android:label="AutoDrive OS"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
+        <!-- fullSensor permette sia l'uso verticale su Telefono sia l'uso orizzontale su Tablet Auto -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="fullSensor"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode">
             <intent-filter>

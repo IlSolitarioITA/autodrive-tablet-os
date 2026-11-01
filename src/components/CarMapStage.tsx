@@ -290,71 +290,74 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
   const googleNavIntentUri = `google.navigation:q=${encodeURIComponent(activeDestination.address)}&mode=d`;
 
   return (
-    <div className="relative flex flex-col w-full h-full min-h-[380px] max-h-[620px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900">
+    <div className="relative flex flex-col w-full h-full min-h-[380px] max-h-[640px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900">
       {/* Top Turn-by-Turn & Search HUD Bar */}
-      <div className="z-20 flex flex-col gap-2 p-3 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="z-20 flex flex-col gap-2 p-2.5 sm:p-3 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
           {/* Turn-by-turn primary maneuver */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-600 text-white shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-600 text-white shrink-0">
               <CornerUpRight className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-lg font-bold text-white tabular-nums">
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono text-base sm:text-lg font-bold text-white tabular-nums">
                   {activeDestination.nextTurnDistMeters} m
                 </span>
                 <span className="text-xs text-slate-400">·</span>
-                <span className="text-xs font-medium text-blue-400 truncate">
+                <span className="text-xs font-medium text-blue-400 truncate max-w-[180px] sm:max-w-none">
                   Verso: {activeDestination.label}
                 </span>
               </div>
-              <p className="text-sm font-semibold text-slate-100 truncate">
+              <p className="text-xs sm:text-sm font-semibold text-slate-100 truncate">
                 {activeDestination.nextTurnText}
               </p>
             </div>
           </div>
 
           {/* Map Engine Switcher + Real GPS Lock Button */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="w-full sm:w-auto flex flex-wrap items-center justify-between sm:justify-end gap-1.5">
             <button
               type="button"
               onClick={handleRecenterRealGps}
-              className={`min-h-[42px] px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+              className={`min-h-[38px] sm:min-h-[42px] px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 hasRealGps
                   ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/30'
                   : 'bg-blue-600 hover:bg-blue-500 border-blue-500 text-white'
               }`}
               title="Attiva e centra il GPS reale del tuo dispositivo"
             >
-              <LocateFixed className="w-4 h-4" />
-              {hasRealGps ? 'GPS Reale Attivo' : 'Usa Mia Posizione GPS'}
+              <LocateFixed className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="sm:hidden">{hasRealGps ? 'GPS Attivo' : 'Posizione GPS'}</span>
+              <span className="hidden sm:inline">
+                {hasRealGps ? 'GPS Reale Attivo' : 'Usa Mia Posizione GPS'}
+              </span>
             </button>
 
             <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl shrink-0">
               <button
                 type="button"
                 onClick={() => onChangeMapMode('google_live')}
-                className={`min-h-[40px] px-2.5 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                className={`min-h-[36px] sm:min-h-[40px] px-2 sm:px-2.5 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
                   mapMode === 'google_live'
                     ? 'bg-blue-600 text-white'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
                 <Navigation className="w-3.5 h-3.5" />
-                Maps Live
+                <span>Maps Live</span>
               </button>
               <button
                 type="button"
                 onClick={() => onChangeMapMode('offline_vector')}
-                className={`min-h-[40px] px-2.5 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                className={`min-h-[36px] sm:min-h-[40px] px-2 sm:px-2.5 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
                   mapMode === 'offline_vector'
                     ? 'bg-amber-600 text-white'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                Offline ({cachedRegionsCount})
+                <span>Offline ({cachedRegionsCount})</span>
               </button>
             </div>
           </div>
@@ -362,28 +365,28 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
 
         {/* Search Input + Quick Destination Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[240px]">
+          <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[200px]">
             <label htmlFor="car-map-destination-input" className="sr-only">
               Cerca destinazione o indirizzo
             </label>
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="car-map-destination-input"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cerca qualsiasi città o indirizzo..."
-              className="w-full min-h-[42px] pl-10 pr-16 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+              placeholder="Cerca città o indirizzo..."
+              className="w-full min-h-[40px] sm:min-h-[42px] pl-9 pr-14 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
             />
             <button
               type="submit"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 min-h-[32px] px-3 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors whitespace-nowrap"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 min-h-[30px] px-2.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors whitespace-nowrap"
             >
               Vai
             </button>
           </form>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto">
+          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
             {PRESET_DESTINATIONS.slice(0, 3).map((dest) => {
               const isSelected = activeDestination.id === dest.id;
               return (
@@ -394,7 +397,7 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
                     setUserSelectedRoute(true);
                     onSelectDestination(dest);
                   }}
-                  className={`min-h-[42px] px-3 py-1.5 rounded-xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 border ${
+                  className={`min-h-[38px] sm:min-h-[42px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 border ${
                     isSelected
                       ? 'bg-slate-800 text-blue-400 border-blue-500/60'
                       : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:bg-slate-800'
@@ -412,7 +415,7 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
       <div className="relative flex-1 w-full min-h-[250px]" style={{ height: '100%' }}>
         {mapMode === 'google_live' && hasValidMapsKey ? (
           <APIProvider apiKey={apiKey} language="it" region="IT">
-            <div className="w-full h-full min-h-[300px]" style={{ height: '100%', width: '100%' }}>
+            <div className="w-full h-full min-h-[280px]" style={{ height: '100%', width: '100%' }}>
               <Map
                 defaultCenter={currentCoords}
                 defaultZoom={15}
@@ -420,7 +423,7 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
                 gestureHandling="greedy"
                 disableDefaultUI={true}
                 internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-                style={{ width: '100%', height: '100%', minHeight: '300px' }}
+                style={{ width: '100%', height: '100%', minHeight: '280px' }}
               >
                 <LiveGpsMapController
                   coords={currentCoords}
@@ -450,7 +453,7 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
           /* High-Contrast Vector Offline Map Engine (Tunnel / Zero-Data Mode) */
           <div
             data-testid="offline-vector-map-canvas"
-            className="relative w-full h-full min-h-[300px] bg-[#0B1220] flex flex-col justify-between overflow-hidden select-none"
+            className="relative w-full h-full min-h-[280px] bg-[#0B1220] flex flex-col justify-between overflow-hidden select-none"
           >
             <svg
               className="absolute inset-0 w-full h-full"
@@ -520,11 +523,11 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
               </text>
             </svg>
 
-            <div className="relative z-10 m-3.5 p-3 rounded-xl bg-slate-950/85 border border-slate-800/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-2">
+            <div className="relative z-10 m-3 p-2.5 sm:p-3 rounded-xl bg-slate-950/85 border border-slate-800/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs text-amber-300">
                 <WifiOff className="w-4 h-4 shrink-0" />
                 <span>
-                  Motore Vettoriale Offline Attivo · Tiles su memoria tablet ({cachedRegionsCount} regioni)
+                  Motore Vettoriale Offline Attivo · Tiles su memoria ({cachedRegionsCount} regioni)
                 </span>
               </div>
               <span className="text-xs font-mono text-slate-400 tabular-nums">
@@ -536,8 +539,8 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
       </div>
 
       {/* Bottom Telemetry & Native Intent Bar */}
-      <div className="z-20 px-4 py-3 bg-slate-950/95 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-5">
+      <div className="z-20 px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-950/95 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-5">
           {/* Real GPS Speedometer + Limit */}
           <div className="flex items-center gap-2.5">
             <div className="flex flex-col">
@@ -545,38 +548,38 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
                 Velocità {hasRealGps ? '(GPS Reale)' : '(Fermo)'}
               </span>
               <div className="flex items-baseline gap-1">
-                <span className="font-mono text-2xl font-bold text-white tabular-nums">
+                <span className="font-mono text-xl sm:text-2xl font-bold text-white tabular-nums">
                   {vehicleSpeedKmh}
                 </span>
                 <span className="text-xs text-slate-400">km/h</span>
               </div>
             </div>
             <div
-              className="w-10 h-10 rounded-full border-[3px] border-red-500 bg-white text-slate-950 flex items-center justify-center font-mono text-xs font-extrabold tabular-nums shrink-0"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-[3px] border-red-500 bg-white text-slate-950 flex items-center justify-center font-mono text-xs font-extrabold tabular-nums shrink-0"
               title="Limite di velocità"
             >
               50
             </div>
           </div>
 
-          <div className="h-8 w-px bg-slate-800" />
+          <div className="h-7 w-px bg-slate-800 hidden sm:block" />
 
           {/* ETA & Remaining Distance + Real GPS Position */}
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs">
             <div>
-              <span className="text-slate-400 block">Tempo stimato</span>
-              <span className="font-mono text-base font-bold text-emerald-400 tabular-nums">
+              <span className="text-slate-400 block">ETA</span>
+              <span className="font-mono text-sm sm:text-base font-bold text-emerald-400 tabular-nums">
                 {displayEtaMin} min
               </span>
             </div>
             <div>
               <span className="text-slate-400 block">Distanza</span>
-              <span className="font-mono text-base font-semibold text-slate-100 tabular-nums">
+              <span className="font-mono text-sm sm:text-base font-semibold text-slate-100 tabular-nums">
                 {displayDistKm} km
               </span>
             </div>
-            <div className="hidden sm:block max-w-[240px]">
-              <span className="text-slate-400 block">{gpsStatusText}</span>
+            <div className="max-w-[180px] sm:max-w-[240px]">
+              <span className="text-slate-400 block truncate">{gpsStatusText}</span>
               <span className="text-xs font-medium text-slate-200 flex items-center gap-1 truncate">
                 <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                 <span className="truncate">{currentCoords.label}</span>
@@ -589,11 +592,11 @@ export const CarMapStage: React.FC<CarMapStageProps> = ({
         <div className="flex items-center gap-2">
           <a
             href={googleNavIntentUri}
-            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            className="min-h-[40px] sm:min-h-[44px] px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
             title="Avvia Intent nativo Google Maps su telefono/tablet Android"
           >
             <Compass className="w-4 h-4 text-blue-400" />
-            Intent Maps APK
+            <span>Intent Maps APK</span>
             <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
           </a>
         </div>
