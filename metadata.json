@@ -1,0 +1,11 @@
+{
+  "name": "AutoDrive Tablet OS",
+  "description": "Sistema di infotainment e launcher automobilistico per tablet Android con bridge leggero smartphone (senza hotspot telefono), mappe Google Maps e vettoriali offline, integrazione Metrolist e WhatsApp, e doppio motore vocale Locale Offline + Gemini AI.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

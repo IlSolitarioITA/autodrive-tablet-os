@@ -1,0 +1,60 @@
+name: Build AutoDrive Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout codice sorgente
+        uses: actions/checkout@v4
+
+      - name: Configura Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configura Java 17 per Android SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Installa dipendenze e compila Web Bundle (dist)
+        run: |
+          npm install
+          npm run build
+          mkdir -p android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/public/
+
+      - name: Configura Gradle 8.7 e compila APK firmato
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Genera AutoDrive-Tablet-OS.apk
+        working-directory: android
+        run: gradle assembleRelease
+
+      - name: Rinonima APK pronto per il download
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk ./AutoDrive-Tablet-OS.apk
+
+      - name: Carica APK negli Artifacts scaricabili
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoDrive-Tablet-OS-APK
+          path: ./AutoDrive-Tablet-OS.apk
+
+      - name: Pubblica APK nella sezione Releases di GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "AutoDrive Tablet OS v1.0.${{ github.run_number }} (APK Android)"
+          body: "Scarica il file **AutoDrive-Tablet-OS.apk** qui sotto e aprilo sul tuo telefono o tablet Android per installare l'applicazione nativa completa."
+          files: ./AutoDrive-Tablet-OS.apk
